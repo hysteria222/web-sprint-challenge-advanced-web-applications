@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { NavLink, Routes, Route, useNavigate } from 'react-router-dom'
 import Articles from './Articles'
 import LoginForm from './LoginForm'
@@ -14,9 +14,8 @@ export default function App() {
   // ✨ MVP can be achieved with these states
   const [message, setMessage] = useState('')
   const [articles, setArticles] = useState([])
-  const [currentArticleId, setCurrentArticleId] = useState()
+  const [currentArticleId, setCurrentArticleId] = useState(null)
   const [spinnerOn, setSpinnerOn] = useState(false)
- 
   // ✨ Research `useNavigate` in React Router v.6
   const navigate = useNavigate()
   const redirectToLogin = () => { navigate('/') }
@@ -68,9 +67,10 @@ export default function App() {
         try {
           const res = await axios.get(
             articlesUrl,
-            { headers: { Authorization: token } }, 
+            { headers: { Authorization: token } },
           )
-          setArticles([res.data.articles])
+          setArticles(res.data.articles)
+          setMessage(res.data.message)
         } catch (err) {
           if (err.response.status == 401) logout()
         } finally { 
@@ -87,40 +87,104 @@ export default function App() {
 
 
 
-  const postArticle = article => {
+  const postArticle = payload => {
     // ✨ implement
     // The flow is very similar to the `getArticles` function.
     // You'll know what to do! Use log statements or breakpoints
     // to inspect the response from the server.
+    setSpinnerOn(true)
+    const token = localStorage.getItem('token')
+    const PostingArticles = async () => {
+      try {
+         const res = await axios.post(
+          articlesUrl,
+          { 'title': `${payload.title}`, 'text': `${payload.text}`, 'topic': `${payload.topic}`},
+          { headers: { Authorization: token }, 
+          'Content-Type': 'application/json'}, 
+        )
+        console.log(res.data)
+        const newArt = res.data.article
+        setArticles([...articles, newArt]);
+        setMessage(res.data.message)
+      } catch (err) {
+        console.log(err.message)
+      } finally { 
+        setSpinnerOn(false)
+      }
+    }
+    PostingArticles()
   }
 
-  const updateArticle = ({ article_id, article }) => {
+  const updateArticle = (payload, currentArticle) => {
     // ✨ implement
     // You got this!
+    const article_id = currentArticle.article_id
+    const token = localStorage.getItem('token')
+    setSpinnerOn(true)
+    const PuttingArticles = async () => {
+      try {
+        const res = await axios.put(
+          `http://localhost:9000/api/articles/${article_id}`,
+          { 'title': `${payload.title}`, 'text': `${payload.text}`, 'topic': `${payload.topic}`},
+          { headers: { Authorization: token } }, 
+        )
+        const updatedArt = res.data.article
+        setMessage(res.data.message)
+        setArticles((prevArticles) =>
+            prevArticles.map((art) =>
+              art.article_id === article_id ? updatedArt : art
+            )
+          );
+      } catch (err) {
+        setMessage(err.response.message)
+      } finally { 
+        setSpinnerOn(false)
+      }
+    }
+    PuttingArticles()
   }
 
   const deleteArticle = article_id => {
     // ✨ implement
+    const token = localStorage.getItem('token')
+    setSpinnerOn(true)
+    const deletingArticle = async () => {
+      try {
+        const res = await axios.delete(
+          `http://localhost:9000/api/articles/${article_id}`,
+          { headers: { Authorization: token } }
+        )
+        setArticles((prevArticles) =>
+          prevArticles.filter((art) => art.article_id !== article_id)
+        );
+        setMessage(res.data.message)
+      } catch (err) {
+        console.log(err.message)
+      } finally { 
+        setSpinnerOn(false)
+      }
+    }
+    deletingArticle()
   }
 
   return (
     // ✨ fix the JSX: `Spinner`, `Message`, `LoginForm`, `ArticleForm` and `Articles` expect props ❗
     <>
-      <Spinner />
+      <Spinner on={spinnerOn}/>
       <Message message={message}/>
       <button id="logout" onClick={logout}>Logout from app</button>
       <div id="wrapper" style={{ opacity: spinnerOn ? "0.25" : "1" }}> {/* <-- do not change this line */}
         <h1>Advanced Web Applications</h1>
         <nav>
           <NavLink id="loginScreen" to="/">Login</NavLink>
-          <NavLink id="articlesScreen" to="/articles">Articles</NavLink>
+          <NavLink id="articlesScreen" to="/">Articles</NavLink>
         </nav>
         <Routes>
           <Route path="/" element={<LoginForm login={login} />} />
           <Route path="articles" element={
             <>
-              <ArticleForm />
-              <Articles getArticles={getArticles} articles={articles}/>
+              <ArticleForm getArticles={getArticles} updateArticle={updateArticle} postArticle={postArticle} articles={articles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId}/>
+              <Articles deleteArticle={deleteArticle} getArticles={getArticles} articles={articles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId}/>
             </>
           } />
         </Routes>

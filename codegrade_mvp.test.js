@@ -14,6 +14,7 @@ const renderApp = ui => {
   window.localStorage.clear()
   window.history.pushState({}, 'Test page', '/')
   return render(ui)
+  
 }
 let server
 beforeAll(() => {
